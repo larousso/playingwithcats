@@ -137,36 +137,4 @@ object MainMtl extends App {
       } yield ()
     }
   }
-
-
-
-//  def process[F[_]: ReservationsState: EventLog : AppErrors](
-//                                                              commands: Stream[F, Command],
-//                                                              initial: Reservations
-//                                                            ): Stream[F, (Reservations, List[Event])] = {
-//    commands.evalMapAccumulate(initial) { (state, command) =>
-//      val value: F[(List[Event], Reservations)] = for {
-//        _ <- MonadState[F, Reservations].set(state)
-//        l <- processCommand(command).listen[List[Event]]
-//        s <- MonadState[F, Reservations].get
-//      } yield (l._2, s)
-//      val v: F[(Reservations, List[Event])] = value.recover {
-//        case _: AppError =>
-//          (Nil, state)
-//      } map { case (events, nextState) =>
-//        (nextState, events)
-//      }
-//      v
-//    }
-//  }
-//
-//  def persist(stream: Stream[IO, (Reservations, List[Event])]) =
-//    stream.evalMap {
-//      case ( state, events) =>
-//        (persistState(state), persistEvents(events)).tupled.void
-//    }
-//
-//  def persistEvents(events: List[Event]): IO[Unit] = ???
-//  def persistState(reservations: Reservations): IO[Unit] = ???
-
 }
