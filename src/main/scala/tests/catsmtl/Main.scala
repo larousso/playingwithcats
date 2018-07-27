@@ -1,18 +1,15 @@
 package tests.catsmtl
 
 import cats.effect.IO
-import cats.mtl.{FunctorTell, MonadState}
 import fs2.Stream
+import tests.catsmtl.MainMtl._
 
 
 object Main extends App {
 
-  import cats._
   import cats.data._
   import cats.implicits._
 
-
-  import cats.~>
 
   case class Reservation(id: String)
   case class Reservations(reservations: List[Reservation] = List.empty)
@@ -21,14 +18,12 @@ object Main extends App {
   case class ReservationCreated(id: String)
   sealed trait Command
   case class Create(id: String, guests: Int) extends Command
-
+  case class CreatedEvent(id: String) extends Event
 
   type AppError = String
   type Result[T] = Either[AppError, T]
   type EventAnd[T] = WriterT[Result, List[Event], T]
   type CommandProcessor[T] = StateT[EventAnd, Reservations, T]
-  //type CommandProcessor[T] = StateT[EventAnd, Reservations, T]
-
 
   def process(commands: Stream[IO, Command], initial: Reservations): Stream[IO, (Reservations, List[Event])] = {
     commands.mapAccumulate(initial) { (state, command) =>
@@ -50,6 +45,9 @@ object Main extends App {
   def persistEvents(events: List[Event]): IO[Unit] = ???
   def persistState(reservations: Reservations): IO[Unit] = ???
 
+
+  println(processCommand(Create("id", 2)).run(Reservations()).run)
+
   def processCommand(command: Command): CommandProcessor[Unit] = {
     command match {
       case c: Create =>
@@ -59,7 +57,10 @@ object Main extends App {
     }
   }
 
-  def validateDup(command: Create): CommandProcessor[Unit] = ???
+  def validateDup(command: Create): CommandProcessor[Unit] = {
+    val res: Result[Unit] = ().asRight[AppError]
+    StateT.liftF[EventAnd, Reservations, Unit](WriterT.liftF(res))
+  }
 
 
   def validateGuest(command: Create): CommandProcessor[Unit] = {
@@ -69,7 +70,7 @@ object Main extends App {
     } else {
       for {
         state <- StateT.get[EventAnd, Reservations]
-        events = generateEvents(state)
+        events = generateEvents(command)
         _ <- StateT.liftF[EventAnd, Reservations, Unit](WriterT.tell[Result, List[Event]](events))
         newState = generateNewState(state, events)
         _ <- StateT.set[EventAnd, Reservations](newState)
@@ -77,7 +78,15 @@ object Main extends App {
     }
   }
 
-  def generateEvents(reservations: Reservations): List[Event] = ???
-  def generateNewState(reservations: Reservations, events: List[Event]): Reservations = ???
+  def generateEvents(command: Create): List[Event] = List(CreatedEvent(command.id))
+  def generateNewState(reservations: Reservations, events: List[Event]): Reservations = {
+    events.foldLeft(reservations)(appyEvent)
+  }
+
+  def appyEvent(reservations: Reservations, event: Event): Reservations = {
+    event match {
+      case CreatedEvent(id) => reservations.copy(Reservation(id) :: reservations.reservations)
+    }
+  }
 
 }
